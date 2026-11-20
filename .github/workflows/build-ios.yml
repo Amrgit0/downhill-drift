@@ -33,3 +33,15 @@ jobs:
             -archivePath build/DownhillDrift.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             archive
+
+      - name: Package .ipa
+        run: |
+          mkdir -p build/ipa_root/Payload
+          cp -R build/DownhillDrift.xcarchive/Products/Applications/App.app build/ipa_root/Payload/
+          (cd build/ipa_root && zip -qry ../DownhillDrift.ipa Payload)
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DownhillDrift-ipa
+          path: build/DownhillDrift.ipa
