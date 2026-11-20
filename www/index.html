@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Downhill Drift</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; touch-action: none; user-select: none; }
+    body { background: #111827; color: #f9fafb; font-family: system-ui, sans-serif; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #hud {
+      position: fixed; top: 16px; left: 16px; right: 16px;
+      display: flex; justify-content: space-between; font-weight: 700; font-size: 18px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.6); pointer-events: none;
+    }
+    .controls {
+      position: fixed; bottom: 24px; left: 24px; right: 24px;
+      display: flex; justify-content: space-between; pointer-events: none;
+    }
+    .btn {
+      pointer-events: auto; width: 84px; height: 84px; border-radius: 50%;
+      background: rgba(255,255,255,0.18); border: 2px solid rgba(255,255,255,0.45);
+      color: #fff; font-size: 28px; font-weight: 700; backdrop-filter: blur(6px);
+    }
+    .btn:active { background: rgba(59,130,246,0.65); transform: scale(0.95); }
+    #overlay {
+      position: fixed; inset: 0; background: rgba(17,24,39,0.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    }
+    #overlay.hidden { display: none; }
+    #startBtn {
+      padding: 14px 28px; font-size: 18px; font-weight: 700; border: none; border-radius: 12px;
+      background: #3b82f6; color: #fff; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div id="dist">Distance: 0 m</div>
+    <div id="speed">Speed: 0 km/h</div>
+  </div>
+  <canvas id="game"></canvas>
+  <div class="controls">
+    <button class="btn" id="brakeBtn">◀</button>
+    <button class="btn" id="gasBtn">▶</button>
+  </div>
+  <div id="overlay">
+    <h1 id="title">Downhill Drift</h1>
+    <p id="sub">Hold ▶ to accelerate down the slope, ◀ to brake.</p>
+    <button id="startBtn">Play</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const distEl = document.getElementById('dist');
+    const speedEl = document.getElementById('speed');
+    const overlay = document.getElementById('overlay');
+    const titleEl = document.getElementById('title');
+    const subEl = document.getElementById('sub');
+    const startBtn = document.getElementById('startBtn');
+
+    let w, h, running = false, keys = { gas: false, brake: false };
+    let car, distance, obstacles;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function slopeY(x) {
+      return h * 0.35 + x * 0.24 + Math.sin(x * 0.004) * 55;
+    }
+    function slopeAngle(x) {
+      const dx = 4;
+      return Math.atan2(slopeY(x + dx) - slopeY(x - dx), dx * 2);
+    }
+
+    function resetGame() {
+      car = { x: 120, vx: 4, radius: 18, angle: 0 };
+      distance = 0;
+      obstacles = [];
+      for (let i = 1; i <= 12; i++) {
+        obstacles.push({ x: i * 420 + Math.random() * 140, r: 18 });
+      }
+    }
+
+    function bindHold(id, prop) {
+      const el = document.getElementById(id);
+      const on = (e) => { e.preventDefault(); keys[prop] = true; };
+      const off = (e) => { e.preventDefault(); keys[prop] = false; };
+      ['pointerdown', 'touchstart', 'mousedown'].forEach(ev => el.addEventListener(ev, on));
+      ['pointerup', 'pointerleave', 'pointercancel', 'touchend', 'mouseup'].forEach(ev => el.addEventListener(ev, off));
+    }
+    bindHold('gasBtn', 'gas');
+    bindHold('brakeBtn', 'brake');
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'd') keys.gas = true;
+      if (e.key === 'ArrowLeft' || e.key === 'a') keys.brake = true;
+    });
+    window.addEventListener('keyup', e => {
+      if (e.key === 'ArrowRight' || e.key === 'd') keys.gas = false;
+      if (e.key === 'ArrowLeft' || e.key === 'a') keys.brake = false;
+    });
+
+    function gameOver(reason) {
+      running = false;
+      titleEl.textContent = 'Crashed!';
+      subEl.textContent = `${reason} You reached ${Math.floor(distance)} m.`;
+      startBtn.textContent = 'Drive Again';
+      overlay.classList.remove('hidden');
+    }
+
+    function update() {
+      if (!running) return;
+      const angle = slopeAngle(car.x);
+      car.vx += Math.sin(angle) * 0.32;
+      if (keys.gas) car.vx += 0.28;
+      if (keys.brake) car.vx *= 0.94;
+      car.vx *= 0.992;
+      car.vx = Math.max(0, Math.min(car.vx, 26));
+
+      car.x += car.vx;
+      car.angle = angle;
+      distance =
